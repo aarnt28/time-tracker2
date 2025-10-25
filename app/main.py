@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, Text, or_, desc
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 # ---------- Config ----------
@@ -27,7 +28,29 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-engine = create_engine(f"sqlite:///{DB_FILE}", connect_args={"check_same_thread": False})
+# honour external database URLs when provided (e.g. docker compose)
+DEFAULT_DB_URL = f"sqlite:///{DB_FILE}"
+DB_URL = os.environ.get("DB_URL") or os.environ.get("DATABASE_URL") or DEFAULT_DB_URL
+
+
+def _sqlite_connect_args(url: str) -> Dict[str, Any]:
+    if not url.startswith("sqlite"):
+        return {}
+    connect_args: Dict[str, Any] = {"check_same_thread": False}
+    try:
+        url_obj = make_url(url)
+        db_path = url_obj.database
+        if db_path and db_path != ":memory:":
+            path = Path(db_path)
+            if not path.is_absolute():
+                path = (BASE_DIR / db_path).resolve()
+            path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    return connect_args
+
+
+engine = create_engine(DB_URL, connect_args=_sqlite_connect_args(DB_URL))
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
