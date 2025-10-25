@@ -1,0 +1,29 @@
+<tr data-id="{{ r.id }}">
+  <td class="mono">{{ r.id }}</td>
+  <td>{{ r.client }}</td>
+  <td class="mono">{{ r.client_key }}</td>
+  <td>{{ r.start_iso|timeonly }}</td>
+  <td>{{ r.end_iso|timeonly }}</td>
+  <td class="mono">{{ r.rounded_minutes }}</td>
+  <td class="mono">{{ r.rounded_hours|hours2d }}</td>
+
+  <td class="note">
+    <div class="note-cell {% if r.note %}collapsed{% endif %}">
+      {% if r.note %}
+      <button class="note-toggle" type="button" aria-label="Expand note" aria-expanded="false"></button>
+      {% endif %}
+      <div class="note-preview">{{ r.note or "" }}</div>
+    </div>
+  </td>
+
+  <td>
+    <form class="invoice-form">
+      <input name="invoice_number" value="{{ r.invoice_number or '' }}" placeholder="e.g. INV-2025-001" />
+    </form>
+  </td>
+
+  <td class="action">
+    <button class="pill {{ 'ok' if r.completed else '' }} js-toggle" title="Toggle done">{{ 'Done' if r.completed else 'Open' }}</button>
+    <button class="icon danger js-del" title="Delete">✕</button>
+  </td>
+</tr>

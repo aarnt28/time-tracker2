@@ -1,0 +1,40 @@
+{% for r in rows %}
+<tr class="row {{ 'is-done' if r.completed else '' }}">
+  <td class="mono">
+  	<a href="#" class="edit-entry" data-id="{{ r.id }}"</a>
+  </td>
+  <td>
+    <!-- client name becomes a link that opens modal; visible text unchanged -->
+    <a href="#" data-client="{{ r.client }}">{{ r.client }}</a>
+  </td>
+  <td class="mono">{{ r.client_key }}</td>
+  <td class="mono">{{ r.start_iso | fmt_dt }}</td>
+  <td class="mono">{{ r.end_iso | fmt_dt }}</td>
+  <td class="mono">{{ r.minutes }}</td>
+  <td class="mono">{{ r.rounded_hours }}</td>
+  <td class="note">
+    <details {{ 'open' if r.note and '\n' in r.note }}>
+      <summary data-note-toggle>{{ (r.note or '').split('\n', 1)[0] }}</summary>
+      {% if r.note and '\n' in r.note %}
+        <div class="note-more">{{ (r.note or '').split('\n', 1)[1] }}</div>
+      {% endif %}
+    </details>
+  </td>
+  <td>
+    <form action="/ui/entries/{{ r.id }}/set-invoice" method="post">
+      <input class="mono" type="text" name="invoice_number" value="{{ r.invoice_number or '' }}" placeholder="e.g. INV-2025-001" />
+    </form>
+  </td>
+  <td class="td-action">
+    <form action="/ui/entries/{{ r.id }}/toggle-completed" method="post">
+      <label class="pill {{ 'pill--done' if r.completed else 'pill--open' }}">
+        <input type="checkbox" {{ 'checked' if r.completed }} />
+        <span>{{ 'Done' if r.completed else 'Open' }}</span>
+      </label>
+    </form>
+    <form action="/ui/entries/{{ r.id }}/delete" method="post">
+      <button class="btn btn-danger" type="submit">×</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}

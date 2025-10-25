@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entries</title>
+
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="icon" href="/static/favicon.ico" />
+</head>
+<body class="dashboard">
+  <header class="app-header">
+    <div class="container">
+      <h1>Entries</h1>
+
+      <form class="filters" action="/" method="get">
+        <div class="row">
+          <label>
+            <span>Client</span>
+            <input type="text" name="client" value="{{ client or '' }}" />
+          </label>
+          <label>
+            <span>Key</span>
+            <input type="text" name="client_key" value="{{ client_key or '' }}" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="" {{ 'selected' if not status }}>All</option>
+              <option value="open" {{ 'selected' if status == 'open' }}>Open</option>
+              <option value="done" {{ 'selected' if status == 'done' }}>Done</option>
+            </select>
+          </label>
+          <label>
+            <span>Search</span>
+            <input type="text" name="q" value="{{ q or '' }}" placeholder="client, key, note, invoice…" />
+          </label>
+          <label>
+            <span>Since</span>
+            <input type="date" name="since" value="{{ since or '' }}" />
+          </label>
+          <label>
+            <span>Until</span>
+            <input type="date" name="until" value="{{ until or '' }}" />
+          </label>
+          <label>
+            <span>Sort</span>
+            <select name="sort">
+              <option value="open_first_newest" {{ 'selected' if sort == 'open_first_newest' }}>Open first, newest</option>
+              <option value="id_asc" {{ 'selected' if sort == 'id_asc' }}>ID asc</option>
+              <option value="start_asc" {{ 'selected' if sort == 'start_asc' }}>Start asc</option>
+              <option value="start_desc" {{ 'selected' if sort == 'start_desc' }}>Start desc</option>
+            </select>
+          </label>
+          <label>
+            <span>Limit</span>
+            <input class="mono" type="number" name="limit" value="{{ limit }}" min="1" max="2000" />
+          </label>
+          <button class="btn" type="submit">Apply</button>
+          <a class="btn" href="/">Clear</a>
+        </div>
+      </form>
+
+      <div class="actions">
+        <a class="btn" href="/api/export.csv?client={{ client or '' }}&client_key={{ client_key or '' }}&completed=&since={{ since or '' }}&until={{ until or '' }}&q={{ q or '' }}&sort={{ sort or '' }}&limit={{ limit or 500 }}">Export CSV</a>
+        <a class="btn" href="/clients">Clients</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="table-wrap">
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Client</th>
+              <th>Key</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Minutes</th>
+              <th>Rounded hrs</th>
+              <th>Note</th>
+              <th>Invoice #</th>
+              <th class="th-action">Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            {% include "_rows.html" %}
+          </tbody>
+        </table>
+      </div>
+      <p class="table-hint">Inline edits auto-save. CSV export respects current filters and sort.</p>
+    </section>
+  </main>
+  
+  <!-- Entry edit modal -->
+	<div id="entry-modal" class="modal-root" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000;">
+	  <div class="modal-card" style="max-width:720px; margin:5vh auto; background:#fff; border-radius:12px; padding:20px;">
+	    <header style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+	      <h2 id="entry-modal-title" style="margin:0; font-size:1.25rem;">Edit Entry</h2>
+	      <button id="entry-modal-close" class="btn">Close</button>
+	    </header>
+	
+	    <form id="entry-edit-form" method="post">
+	      <div class="grid-2">
+	        <label><span>Client</span><input type="text" name="client" required /></label>
+	        <label><span>Key</span><input type="text" name="client_key" required /></label>
+	        <label><span>Start (ISO)</span><input type="text" name="start_iso" class="mono" /></label>
+	        <label><span>End (ISO)</span><input type="text" name="end_iso" class="mono" /></label>
+	        <label><span>Invoice #</span><input type="text" name="invoice_number" class="mono" /></label>
+	        <label><span>Completed</span><input type="checkbox" name="completed" /></label>
+	      </div>
+	
+	      <label style="display:block; margin-top:10px;">
+	        <span>Note</span>
+	        <textarea name="note" rows="6" style="width:100%;"></textarea>
+	      </label>
+	
+	      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+	        <button type="button" id="entry-modal-cancel" class="btn">Cancel</button>
+	        <button type="submit" class="btn">Save</button>
+	      </div>
+	    </form>
+	  </div>
+	</div>
+
+  <!-- Simple modal (read-only) for client details -->
+  <div id="client-modal" class="modal-root" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35);">
+    <div class="modal-card" style="max-width:640px; margin:5vh auto; background:#fff; border-radius:12px; padding:20px;">
+      <header style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <h2 id="client-modal-title" style="margin:0; font-size:1.25rem;">Client</h2>
+        <button id="client-modal-close" class="btn">Close</button>
+      </header>
+      <div id="client-modal-body" class="mono" style="white-space:pre-wrap;"></div>
+    </div>
+  </div>
+
+  <script>
+	(function(){
+	  const modal = document.getElementById('entry-modal');
+	  const title = document.getElementById('entry-modal-title');
+	  const form  = document.getElementById('entry-edit-form');
+	
+	  const openModal  = ()=> modal.style.display='block';
+	  const closeModal = ()=> modal.style.display='none';
+	
+	  document.getElementById('entry-modal-close').addEventListener('click', closeModal);
+	  document.getElementById('entry-modal-cancel').addEventListener('click', closeModal);
+	  modal.addEventListener('click', (e)=>{ if(e.target.id==='entry-modal') closeModal(); });
+	
+	  // open editor from ID link
+	  document.addEventListener('click', function(e){
+	    const a = e.target.closest('a.edit-entry');
+	    if(!a) return;
+	    e.preventDefault();
+	    const id = a.getAttribute('data-id');
+	    title.textContent = `Edit Entry #${id}`;
+	
+	    fetch(`/api/entries/${id}`)
+	      .then(r => r.ok ? r.json() : Promise.reject())
+	      .then(data => {
+	        form.action = `/ui/entries/${id}/edit`;
+	        form.querySelector('[name=client]').value         = data.client || '';
+	        form.querySelector('[name=client_key]').value     = data.client_key || '';
+	        form.querySelector('[name=start_iso]').value      = data.start_iso || '';
+	        form.querySelector('[name=end_iso]').value        = data.end_iso || '';
+	        form.querySelector('[name=invoice_number]').value = data.invoice_number || '';
+	        form.querySelector('[name=completed]').checked    = !!data.completed;
+	        form.querySelector('[name=note]').value           = data.note || '';
+	        openModal();
+	      })
+	      .catch(()=>{ /* silently ignore */ });
+	  });
+	
+	  // submit and refresh table in place
+	  form.addEventListener('submit', function(e){
+	    e.preventDefault();
+	    const fd = new FormData(form);
+	    if(!fd.get('completed')) fd.set('completed','0');
+	    fetch(form.action, { method:'POST', body: fd })
+	      .then(() => fetch('/ui/table' + location.search))
+	      .then(r  => r.text())
+	      .then(html => {
+	        document.getElementById('rows').innerHTML = (html || '').trim();
+	        closeModal();
+	      })
+	      .catch(console.error);
+	  });
+	})();
+	</script>
+  
+  <script>
+    // Expand/collapse notes
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-note-toggle]');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      tr?.classList.toggle('is-open');
+    });
+  </script>
+
+  <script>
+    // Intercept inline form submits so actions happen quietly (no navigation).
+    // Applies to: toggle done, set invoice, delete.
+    document.addEventListener('submit', function (e) {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (!form.closest('#rows')) return;
+      const path = new URL(form.action, location.href).pathname;
+      if (!/^\/ui\/entries\//.test(path)) return;
+
+      e.preventDefault();
+      const tr = form.closest('tr');
+
+      fetch(form.action, { method: 'POST', body: new FormData(form) })
+        .then(r => r.text())
+        .then(html => {
+          const trimmed = html.trim();
+          if (!trimmed) { tr?.remove(); return; } // delete case
+
+          const tmp = document.createElement('tbody');
+          tmp.innerHTML = trimmed;
+          const newTr = tmp.querySelector('tr');
+          if (newTr && tr) {
+            tr.replaceWith(newTr);
+          }
+
+          // Reload the table to reflect re-sorted state after a toggle.
+          return fetch('/ui/table' + location.search);
+        })
+        .then(r => r ? r.text() : null)
+        .then(html => {
+          if (!html) return;
+          const tbody = document.getElementById('rows');
+          tbody.innerHTML = html.trim();
+        })
+        .catch(console.error);
+    });
+
+    // Submit invoice on Enter or on blur.
+    document.addEventListener('keydown', function (e) {
+      const el = e.target;
+      if (!(el instanceof HTMLInputElement)) return;
+      if (el.name !== 'invoice_number') return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        el.form?.requestSubmit();
+      }
+    });
+    document.addEventListener('blur', function (e) {
+      const el = e.target;
+      if (!(el instanceof HTMLInputElement)) return;
+      if (el.name !== 'invoice_number') return;
+      el.form?.requestSubmit();
+    }, true);
+
+    // ----- Client details modal from client_table.json -----
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[data-client]');
+      if (!a) return;
+      e.preventDefault();
+      const name = a.getAttribute('data-client');
+      const modal = document.getElementById('client-modal');
+      const title = document.getElementById('client-modal-title');
+      const body = document.getElementById('client-modal-body');
+      title.textContent = name;
+      body.textContent = 'Loading…';
+      modal.style.display = 'block';
+      fetch('/api/clients/' + encodeURIComponent(name))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+          const attrs = data.attributes || {};
+          const lines = Object.keys(attrs).sort().map(k => `${k}: ${JSON.stringify(attrs[k])}`);
+          body.textContent = lines.length ? lines.join('\n') : 'No attributes found.';
+        })
+        .catch(() => { body.textContent = 'Not found.'; });
+    });
+    document.getElementById('client-modal-close').addEventListener('click', () => {
+      document.getElementById('client-modal').style.display = 'none';
+    });
+    document.getElementById('client-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'client-modal') e.currentTarget.style.display = 'none';
+    });
+  </script>
+
+  <script>
+    document.addEventListener('change', function (e) {
+      const input = e.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      if (input.type !== 'checkbox') return;
+      const form = input.closest('form');
+      if (!form || !form.action.includes('/toggle-completed')) return;
+      
+      const tr = input.closest('tr');
+      fetch(form.action, { method: 'POST' })
+        .then(r => r.text())
+        .then(html => {
+          const trimmed = (html || '').trim();
+          if (!trimmed) { tr?.remove(); return; }
+
+          const tmp = document.createElement('tbody');
+          tmp.innerHTML = trimmed;
+          const newTr = tmp.querySelector('tr');
+          if (newTr && tr) tr.replaceWith(newTr);
+
+          return fetch('/ui/table' + location.search);
+        })
+        .then(r => r ? r.text() : null)
+        .then(html => {
+          if (!html) return;
+          const tbody = document.getElementById('rows');
+          tbody.innerHTML = html.trim();
+        })
+        .catch(console.error);
+    });
+  </script>
+
+</body>
+</html>

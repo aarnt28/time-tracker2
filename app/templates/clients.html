@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clients</title>
+
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="icon" href="/static/favicon.ico" />
+</head>
+<body class="dashboard">
+  <header class="app-header">
+    <div class="container">
+      <h1>Clients</h1>
+      <div class="actions">
+        <a class="btn" href="/">Back to Entries</a>
+        <button class="btn" id="create-client">New Client</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="table-wrap">
+      <div class="table-scroll">
+        <table class="table" id="clients-table">
+          <thead id="clients-head"></thead>
+          <tbody id="clients-body"></tbody>
+        </table>
+      </div>
+      <p class="table-hint">Click a row to edit attributes. Adding new fields here writes them to client_table.json.</p>
+    </section>
+  </main>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="modal-root" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35);">
+    <div class="modal-card" style="max-width:720px; margin:5vh auto; background:#fff; border-radius:12px; padding:20px;">
+      <header style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <h2 id="edit-title" style="margin:0; font-size:1.25rem;">Edit Client</h2>
+        <button id="edit-close" class="btn">Close</button>
+      </header>
+      <form id="edit-form">
+        <div id="edit-fields"></div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <input type="text" id="new-key" placeholder="new attribute key" class="mono" />
+          <input type="text" id="new-val" placeholder="value" class="mono" />
+          <button class="btn" id="add-attr">Add attribute</button>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Load and render the clients table
+    function renderTable(data) {
+      const head = document.getElementById('clients-head');
+      const body = document.getElementById('clients-body');
+      body.innerHTML = '';
+      head.innerHTML = '';
+
+      const allCols = Array.from(new Set(
+        Object.values(data.clients).flatMap(obj => Object.keys(obj || {}))
+      )).sort();
+
+      // Head
+      const trh = document.createElement('tr');
+      const thName = document.createElement('th'); thName.textContent = 'Client';
+      trh.appendChild(thName);
+      allCols.forEach(k => { const th=document.createElement('th'); th.textContent=k; trh.appendChild(th); });
+      head.appendChild(trh);
+
+      // Rows
+      Object.keys(data.clients).sort((a,b)=>a.localeCompare(b)).forEach(name => {
+        const attrs = data.clients[name] || {};
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td'); tdName.textContent = name; tdName.style.fontWeight='600';
+        tr.appendChild(tdName);
+        allCols.forEach(k => {
+          const td=document.createElement('td'); td.textContent = attrs[k] === undefined ? '' : String(attrs[k]);
+          tr.appendChild(td);
+        });
+        tr.addEventListener('click', () => openEditor(name, attrs, allCols));
+        body.appendChild(tr);
+      });
+    }
+
+    function loadTable() {
+      fetch('/api/clients')
+        .then(r => r.json())
+        .then(data => renderTable(data))
+        .catch(err => console.error(err));
+    }
+
+    function openEditor(name, attrs, allColumns) {
+      const modal = document.getElementById('edit-modal');
+      document.getElementById('edit-title').textContent = name;
+      const fields = document.getElementById('edit-fields');
+      fields.innerHTML = '';
+
+      const keys = Array.from(new Set([...(Object.keys(attrs||{})), ...allColumns]));
+      keys.forEach(k => {
+        const val = attrs[k];
+        const wrap = document.createElement('div'); wrap.style.marginBottom='8px';
+        const label = document.createElement('label'); label.textContent = k; label.style.display='block'; label.style.fontWeight='600';
+        const input = document.createElement('input'); input.type='text'; input.className='mono'; input.style.width='100%';
+        input.name = k; input.value = (val === undefined ? '' : (typeof val === 'object' ? JSON.stringify(val) : String(val)));
+        wrap.appendChild(label); wrap.appendChild(input);
+        fields.appendChild(wrap);
+      });
+
+      // Add attribute UI
+      document.getElementById('add-attr').onclick = function(e){
+        e.preventDefault();
+        const k = document.getElementById('new-key').value.trim();
+        const v = document.getElementById('new-val').value.trim();
+        if (!k) return;
+        const wrap = document.createElement('div'); wrap.style.marginBottom='8px';
+        const label = document.createElement('label'); label.textContent = k; label.style.display='block'; label.style.fontWeight='600';
+        const input = document.createElement('input'); input.type='text'; input.className='mono'; input.style.width='100%';
+        input.name = k; input.value = v;
+        wrap.appendChild(label); wrap.appendChild(input);
+        fields.appendChild(wrap);
+        (document.getElementById('new-key')).value = '';
+        (document.getElementById('new-val')).value = '';
+      };
+
+      // Save
+      document.getElementById('edit-form').onsubmit = function(e){
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const obj = {};
+        for (const [k,v] of fd.entries()) {
+          let vv = String(v);
+          // Try to parse JSON when it looks like an object/array/number/bool
+          try { vv = JSON.parse(vv); } catch {}
+          obj[k] = vv;
+        }
+        fetch('/api/clients/' + encodeURIComponent(name), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(obj)
+        })
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(() => { modal.style.display = 'none'; loadTable(); })
+        .catch(err => { console.error(err); alert('Save failed'); });
+      };
+
+      modal.style.display = 'block';
+    }
+
+    // Modal close handlers
+    document.getElementById('edit-close').addEventListener('click', ()=>{ document.getElementById('edit-modal').style.display='none'; });
+    document.getElementById('edit-modal').addEventListener('click', function(e){
+      if (e.target.id === 'edit-modal') this.style.display='none';
+    });
+
+    // Create client
+    document.getElementById('create-client').addEventListener('click', function(){
+      const name = prompt('New client name');
+      if (!name) return;
+      fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, attributes: {} })
+      })
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(() => loadTable())
+      .catch(()=> alert('Create failed'));
+    });
+
+    loadTable();
+  </script>
+</body>
+</html>

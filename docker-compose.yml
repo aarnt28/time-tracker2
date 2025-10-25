@@ -1,0 +1,12 @@
+services:
+  tracker:
+    build: .
+    container_name: time-tracker22
+    environment:
+      API_TOKEN: ${API_TOKEN:-CaRpoauTdDYdxQwWhWeXUQy}
+      DB_URL: sqlite:////data/data.db
+    volumes:
+      - ./data:/data        # maps C:\time-tracker\data -> /data in container
+    ports:
+      - "8085:8085"         # Zoraxy will hit this
+    restart: unless-stopped

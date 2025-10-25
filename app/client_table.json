@@ -1,0 +1,71 @@
+{
+  "Dallas Dental Arts": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "dda",
+    "owner": "Dr. Sheena Allen"
+  },
+  "BNR Concrete Polishing": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "bnr",
+    "owner": "David Beck"
+  },
+  "Harrison Law Firm": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "harrison",
+    "owner": "Jim Harrison"
+  },
+  "Pro Dental Dallas (Plano)": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "pdd",
+    "owner": "Dr. Jason Roe"
+  },
+  "Andrew’s Refinishing": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "andrews",
+    "owner": "Simon Tefler"
+  },
+  "Pro Dental Dallas (Downtown)": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "pddd",
+    "owner": [
+      "Dr. Jason Roe",
+      "Dr. Adrian Lobono"
+    ]
+  },
+  "Kidzania - Arlington": {
+	"support_rate": 150,
+    "contract": false,
+    "key": "kz_arlington",
+    "owner": "Dr. Sam"
+  },
+  "Kidzania - Forney": {
+	"support_rate": 150,
+    "contract": false,
+    "key": "kz_forney",
+    "owner": "Dr. Sam"
+  },
+  "Kidzania - Aubrey": {
+	"support_rate": 150,
+    "contract": false,
+    "key": "kz_aubrey",
+    "owner": "Dr. Omar Issa"
+  },
+  "Addison Stone": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "addison_stone",
+    "owner": "James Palmer"
+  },
+  "North Dallas Smiles (NDS)": {
+    "support_rate": 150,
+    "contract": false,
+    "key": "nds",
+    "owner": "Dr. Ejesieme Ezinwanne"
+  }
+}
