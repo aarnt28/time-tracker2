@@ -1,18 +1,40 @@
 FROM python:3.12-slim
 
-# System deps for timezone data
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+# System deps for timezone data and health checks
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata curl \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=America/Chicago
 
 WORKDIR /app
-COPY app /app
+
+COPY . /app
 
 # Python deps
-RUN pip install --no-cache-dir fastapi uvicorn[standard] sqlalchemy jinja2 python-multipart
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir \
+        fastapi \
+        uvicorn[standard] \
+        sqlalchemy \
+        jinja2 \
+        python-multipart \
+        prometheus-fastapi-instrumentator \
+        alembic \
+        gunicorn \
+        psycopg[binary]
 
-# Create data & static (if not present)
-RUN mkdir -p /data /app/static
+# Create data directory and add application user
+RUN addgroup --system app \
+    && adduser --system --ingroup app app \
+    && mkdir -p /data \
+    && chown -R app:app /app /data
 
-EXPOSE 8085
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8085"]
+USER app
+
+EXPOSE 9444
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://127.0.0.1:9444/health || exit 1
+
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:9444", "app.main:app", "--workers", "2"]
