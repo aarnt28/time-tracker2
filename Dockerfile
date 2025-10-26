@@ -37,4 +37,4 @@ EXPOSE 9444
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f http://127.0.0.1:9444/health || exit 1
 
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:9444", "app.main:app", "--workers", "2"]
+CMD ["python", "-m", "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:9444", "app.main:app", "--workers", "2"]
