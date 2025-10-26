@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+jinja2
+python-multipart
+prometheus-fastapi-instrumentator
+alembic
+gunicorn
+psycopg[binary]
